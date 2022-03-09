@@ -1,6 +1,6 @@
 '''
 author: Martin Paulikat
-Data loader for the crc data. It runs the VA-Gan net.
+Data loader for the crc data. Can also be used for Ctcl
 '''
 
 from pathlib import Path
