@@ -146,7 +146,11 @@ class CycleGAN(LightningModule):
 
         # train with sum (anomaly + anomaly map)
         anomaly_map = generator(inputToBeFaked, sigmoid=opt.sigmoid)
-        img_sum = inputToBeFaked + anomaly_map
+
+        if opt.sigmoid:
+            img_sum = anomaly_map
+        else:
+            img_sum = inputToBeFaked + anomaly_map
         
         err_d_anomaly_map = discriminator(img_sum)
         cri_loss = self.discriminatorLoss(err_d_real, err_d_anomaly_map)
@@ -159,7 +163,12 @@ class CycleGAN(LightningModule):
     def trainStepG(self, inputImage, net_g_0, net_g_1, discriminator, opt, LAMBDA):
 
         anomaly_map = net_g_0(inputImage, sigmoid=opt.sigmoid)
-        output = anomaly_map + inputImage
+
+        if opt.sigmoid:
+            output = anomaly_map
+            anomaly_map = output - inputImage
+        else:
+            output = anomaly_map + inputImage
 
         reconstructed_Map =  net_g_1(output, sigmoid=opt.sigmoid)
 
@@ -187,7 +196,7 @@ class CycleGAN(LightningModule):
             #backward generator
             err_g_backward = self.trainStepG(healthy, self.backward_net_g,  self.forward_net_g, self.backward_net_d, self.opt, self.LAMBDA_NORM)
 
-            err_g_total = err_g_forward + err_g_backward / 2 #do we need /2?
+            err_g_total = err_g_forward + err_g_backward / 2 
 
             return {'loss': err_g_total, 'err_g_forward': err_g_forward.detach(), 'err_g_backward': err_g_backward.detach()}
 
@@ -204,7 +213,7 @@ class CycleGAN(LightningModule):
             #backward discriminator
             err_d_backward = self.trainStepD(healthy, anomaly, self.backward_net_d, self.backward_net_g, self.opt, self.LAMBDA)
 
-            err_d_total = err_d_forward + err_d_backward / 2 #do we need /2?
+            err_d_total = err_d_forward + err_d_backward / 2
 
             self.trainStep += 1
 
@@ -252,6 +261,9 @@ class CycleGAN(LightningModule):
             oneImage = torch.reshape(oneImage, (1, self.opt.channels_number, np.shape(oneImage)[-2], np.shape(oneImage)[-1]))
             oneImageMap = self.forward_net_g(oneImage, sigmoid=self.opt.sigmoid)
 
+            if self.opt.sigmoid:
+                oneImageMap = oneImageMap - oneImage
+
             #we also want to visualize the sanity check
             sanityMap = self.backward_net_g(oneImage + oneImageMap, sigmoid=self.opt.sigmoid)
             oneImageSanity = oneImageMap + sanityMap
@@ -269,8 +281,14 @@ class CycleGAN(LightningModule):
             oneImage = torch.reshape(oneImage, (1, self.opt.channels_number, np.shape(oneImage)[-2], np.shape(oneImage)[-1]))
             oneImageMap = self.backward_net_g(oneImage, sigmoid=self.opt.sigmoid)
 
+            if self.opt.sigmoid:
+                oneImageMap = oneImageMap - oneImage
+
             #we also want to visualize the sanity check
             sanityMap = self.forward_net_g(oneImage + oneImageMap, sigmoid=self.opt.sigmoid)
+
+            if self.opt.sigmoid:
+                oneImageMap = oneImageMap - (oneImage + oneImageMap)
             oneImageSanity = oneImageMap + sanityMap
 
             #save these tensors on to the server
@@ -288,9 +306,9 @@ class CycleGAN(LightningModule):
         anomaly, healthy = batch
 
         #forward generator
-        err_g_forward = self.trainStepG(anomaly, self.forward_net_g, self.backward_net_g, self.forward_net_d, self.opt, self.LAMBDA)
+        err_g_forward = self.trainStepG(anomaly, self.forward_net_g, self.backward_net_g, self.forward_net_d, self.opt, self.LAMBDA_NORM)
         #backward generator
-        err_g_backward = self.trainStepG(healthy, self.backward_net_g,  self.forward_net_g, self.backward_net_d, self.opt, self.LAMBDA)
+        err_g_backward = self.trainStepG(healthy, self.backward_net_g,  self.forward_net_g, self.backward_net_d, self.opt, self.LAMBDA_NORM)
 
         total_g_error = err_g_forward + err_g_backward / 2
 
