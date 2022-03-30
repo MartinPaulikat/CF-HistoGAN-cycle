@@ -181,15 +181,20 @@ class CRCDataLoader(torch.utils.data.Dataset):
         return X, Y
 
 class CRCLightningLoader(LightningDataModule):
-    def __init__(self, options):
+    def __init__(self, options, data):
         super().__init__()
         self.opt = options
+        self.data = data
 
     def prepare_data(self):
-        crcObject = CRCPrep(self.opt.data, self.opt.train, self.opt.eval, self.opt.test, batchsize=self.opt.batch_size, useTorch=self.opt.torch)
+        crcObject = CRCPrep(self.data, self.opt.train, self.opt.eval, self.opt.test, batchsize=self.opt.batch_size, useTorch=self.opt.torch)
         trainGroup, evalGroup, testGroup = crcObject.returnLoaders()
         self.trainDataLoader = trainGroup
         self.evalDataLoader = evalGroup
+        if self.opt.eval == 0:
+            self.evalDataLoader = None
+        else:
+            self.evalDataLoader = evalGroup
         self.testDataLoader = testGroup
 
     def train_dataloader(self):
